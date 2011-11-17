@@ -1,0 +1,301 @@
+#!/usr/bin/env ruby 
+#  xcodearchive.rb
+#  
+#  Created by Guillaume Cerquant on 2011-11-16.
+#  Copyright 2011 MacMation. All rights reserved.
+# 
+
+# What is this?
+#   xcodebuild builds an Xcode project
+#   xcodearchive archive an Xcode project... wait! Apple did not ship an xcodearchive command
+#   This script intends to substitute to it.
+#   It allows you to generate an ipa via the command line
+#
+
+# CHANGELOG
+#   0.2 - Now reads the iPhone developper identity from the Xcode project
+
+# CREDITS
+#   Thank you to Vincent Daubry for his discovery of the xcrun command, which greatly simplified this script
+#   http://blog.octo.com/automatiser-le-deploiement-over-the-air/
+#  
+#   Thank you to Yannick Cadin. Some of his code to detect the SDK version of an Xcode project has been used and adapted to
+#   detect the iPhone developper identity
+#   http://diablotin.info/
+
+
+require 'optparse'
+require 'open3'
+
+
+@version_number="0.2"
+
+
+XCODEBUILD="/Developer/usr/bin/xcodebuild"
+BZR="/usr/local/bin/bzr"
+SVN="/usr/bin/svn"
+
+
+def parse_options
+  @options = {}
+
+  optparse = OptionParser.new do |opts|
+    opts.banner = "Usage: xcodearchive [OPTIONS]"
+
+    opts.on( '', '--version', 'Show version number' ) do
+      puts "Version #{@version_number}"
+      exit
+    end
+    
+
+    @options[:verbose] = false 
+    opts.on( '-v', '--verbose', 'Output more information' ) do
+      @options[:verbose] = true
+    end
+    
+    @options[:growl] = false
+    opts.on( '-g', '--growl', 'Show growl alerts to inform about progress of the build' ) do
+      @options[:growl] = true
+    end
+    
+    @options[:no_symbol] = false
+    opts.on( '-n', '--do_not_keep_dsym_symbols', 'Do not keep the dSYM symbols' ) do
+      @options[:no_symbol] = true
+    end
+
+    @options[:show] = false
+    opts.on( '-s', '--show', 'Show archive in Finder once created' ) do
+      @options[:show] = true
+    end
+
+    @options[:clean_before_building] = false
+    opts.on( '-c', '--clean', 'Do a clean before building the Xcode project' ) do
+      @options[:clean_before_building] = true
+    end
+
+
+    @options[:ipa_export_path] = nil
+    opts.on( '-o', '--ipa_export_path FOLDER', 'Set the path of the folder where the ipa will be saved. Default is \'~/Desktop\'' ) do |ipa_export_folder_path|
+      @options[:ipa_export_path] = ipa_export_folder_path
+    end
+
+    
+    @options[:project] = nil
+    opts.on( '-p', '--project PROJECT', 'Specifiy xcode project') do |xcodeproject_file|
+      @options[:project] = xcodeproject_file
+      #todo : WILL not work with a full file path
+    end
+    
+    # todo : generate a manifest plist file (will be useful when we will be parsing the version number)
+
+    opts.on( '-h', '--help', 'Display this screen' ) do
+      puts opts
+      
+      puts "\n\n\nExamples:\n
+xcodearchive                                => Build the Xcode project of the current folder, generate an archive (ipa), and create a zip with the dSYM symbols
+xcodearchive -n                             => Same as above, but do not keep the symbols
+xcodearchive -o ~/Documents/my_archives -s  => Save the ipa in the given folder, and reveal it in the Finder"
+      
+      exit
+    end
+  end
+
+  optparse.parse!
+  
+end
+
+
+
+def xcode_project_file_path
+  return Dir.pwd + "/" + @options[:project] if (@options[:project])
+  
+  
+  all_xcode_projs = Dir.glob("*.xcodeproj")
+  if (all_xcode_projs.count == 0)
+    puts "Error: 0 xcodeprojects found"
+    exit
+  end
+  
+  if (all_xcode_projs.count != 1)
+    puts "Error: The directory #{Dir.pwd} contains #{all_xcode_projs.count} projects (file with the extension .xcodeproj). Specify the project to use with the --project option."
+    exit
+  end
+  
+  Dir.pwd + "/" + all_xcode_projs[0]
+end
+
+# def sdk_version
+#   "iphoneos5.0" #TODO - Be able to force a sdk version
+#   Will be useful to compile with an older sdk, to make sure no api is used in a version where they do not exists
+# end
+
+
+def project_name
+  File.basename( xcode_project_file_path(), ".xcodeproj")
+
+end
+
+def target_name
+  
+end
+
+def archive_name
+  
+end
+
+
+def path_of_directory_where_to_export
+  if @options[:ipa_export_path]
+    return @options[:ipa_export_path]
+  else
+    return "#{ENV['HOME']}/Desktop/"
+  end
+end
+
+def path_of_created_ipa
+  "#{path_of_directory_where_to_export}/#{project_name}.ipa"
+end
+
+def developper_identity
+  plistBuddy = "/usr/libexec/PlistBuddy"
+  
+
+  root_id = `#{plistBuddy} -c Print\\ :rootObject #{xcode_project_file_path}/project.pbxproj`.chop
+  build_configurations_ID = `#{plistBuddy} -c Print\\ :objects:#{root_id}:buildConfigurationList #{xcode_project_file_path}/project.pbxproj`.chop
+  
+  # TODO: Here we are using an hard coded index
+  release_id = `#{plistBuddy} -c Print\\ :objects:#{build_configurations_ID}:buildConfigurations:1 #{xcode_project_file_path}/project.pbxproj`.chop
+  
+  name_of_configuration = `#{plistBuddy} -c Print\\ :objects:#{release_id}:name #{xcode_project_file_path}/project.pbxproj`.chop  
+  if (name_of_configuration != "Release")
+    puts "Did not found expected configuration - got '#{name_of_configuration}' ; expected 'Release'"
+    exit
+  end
+
+  # all = `#{plistBuddy} -c Print\\ :objects:#{release_id}:buildSettings #{xcode_project_file_path}/project.pbxproj`
+  # puts "all #{all}"
+  
+  identity = `#{plistBuddy} -c Print\\ :objects:#{release_id}:buildSettings:CODE_SIGN_IDENTITY[sdk=iphoneos*] #{xcode_project_file_path}/project.pbxproj`.chop
+  
+  identity
+end
+
+def mobile_provisionning_profile_path
+  "#{Dir.pwd}/build/Release-iphoneos/#{project_name}.app/embedded.mobileprovision"
+end
+
+
+def show_all_parameters
+  puts "Working with #{xcode_project_file_path}" 
+  # puts "SDK Version: #{sdk_version()}"
+end
+
+def verbose
+  @options[:verbose]
+end
+
+
+def mobileprovision_command_installed
+  return system("mobileprovision --version")
+end
+
+def archive_xcode_project
+  
+  puts "Building:\n#{XCODEBUILD} #{xcode_project_file_path()}" if verbose
+  growl_alert("Building", "Building xCode project #{xcode_project_file_path}")
+  
+  if @options[:clean_before_building]
+    puts "Cleaning Xcode project" if verbose
+    `#{XCODEBUILD} -project #{xcode_project_file_path()} clean`
+  end
+  
+  `#{XCODEBUILD} -project #{xcode_project_file_path()}`
+  
+  if (0 != $?.to_i)
+    puts "Error in xcodebuild: #{$?.to_s}"
+    exit
+  end
+  
+  if (verbose && mobileprovision_command_installed)
+    puts "\nmobileprovision file info:"
+    puts `mobileprovision #{mobile_provisionning_profile_path}`
+    puts "\n\n"
+  else 
+    puts "mobileprovision command not found. Unable to give details about the provisionningprofile."
+  end
+  
+  if (verbose)
+    puts "Developper identity: #{developper_identity}"
+  end
+  
+  growl_alert("Archiving", "Identity: #{developper_identity}\nmobileprovision: `mobileprovision #{mobile_provisionning_profile_path}`")
+  
+  xcrun_command = "/usr/bin/xcrun -sdk iphoneos PackageApplication -v \"#{Dir.pwd}/build/Release-iphoneos/#{project_name}.app\" -o \"#{path_of_created_ipa}\" --sign \"#{developper_identity}\" --embed \"#{mobile_provisionning_profile_path}\""
+  puts "Archiving:\n #{xcrun_command}\n\n\n" if verbose
+  `#{xcrun_command}`
+  
+  
+  if (0 != $?.to_i)
+    puts "Error in xcrun: #{$?.to_s}"
+    exit
+  end
+  
+  puts "Archiving succeedeed"
+  puts "IPA file saved to: '#{path_of_created_ipa}'" if verbose
+  
+  reveal_file_in_finder(path_of_created_ipa) if @options[:show]
+  
+end
+
+
+def create_zip_archive_of_the_symbols
+  return if (@options[:no_symbol])
+  
+  puts "Archiving the dSYM symbols"
+
+  date=`date '+%Y%m%d_%H'h'%M'`.chop
+  #todo : _v${PRODUCT_VERSION_NUMBER}_(rev_${BZR_REVNO}
+  filename_for_dsym_symbols_archive="#{project_name}_#{date}_dSYM_symbols.zip" 
+  filepath_for_dsym_symbols_archive="#{path_of_directory_where_to_export}/#{filename_for_dsym_symbols_archive}" 
+  
+  growl_alert("dSYM symbols", "Archiving the dSYM symbols into #{filepath_for_dsym_symbols_archive}")
+  
+  
+  filename_of_generated_symbols="#{project_name}.app.dSYM"
+  
+  # If we don't want to have the archive contain hierarchy, we need to cd first
+  Dir.chdir "#{Dir.pwd}/build/Release-iphoneos" do
+    `zip -r -T -y "#{filepath_for_dsym_symbols_archive}" "#{filename_of_generated_symbols}"`
+  end
+  
+  puts "dSYM symbols archived into #{filepath_for_dsym_symbols_archive}"
+  
+end
+
+def growl_alert(title, message)
+  if (@options[:growl]) 
+    growlnotify="/usr/local/bin/growlnotify" # Edit this if you installed growlnotify in a different place
+    
+    if (File.executable?(growlnotify))
+      `#{growlnotify} "#{title}" -m "#{message}" -d archivingBubble`
+    else
+      puts "Did not found growlnotify command"
+    end
+  end
+end
+
+
+def reveal_file_in_finder(file_path)
+  applescript_command = "tell application \"Finder\"\nreveal POSIX file \"#{file_path}\"\n activate\nend tell"
+  puts "#{applescript_command}"
+  `osascript -e '#{applescript_command}'`
+end
+
+
+parse_options
+
+show_all_parameters if verbose
+
+archive_xcode_project()
+create_zip_archive_of_the_symbols()
+
