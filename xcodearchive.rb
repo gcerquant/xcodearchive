@@ -14,6 +14,7 @@
 
 # CHANGELOG
 #   0.2 - Now reads the iPhone developper identity from the Xcode project
+#   0.3 - Option to set the developper identity - Read the application version number and use it in the filename of zip dSYM symbols
 
 # CREDITS
 #   Thank you to Vincent Daubry for his discovery of the xcrun command, which greatly simplified this script
@@ -28,12 +29,14 @@ require 'optparse'
 require 'open3'
 
 
-@version_number="0.2"
+@version_number="0.3"
 
 
 XCODEBUILD="/Developer/usr/bin/xcodebuild"
 BZR="/usr/local/bin/bzr"
 SVN="/usr/bin/svn"
+PLISTBUDDY = "/usr/libexec/PlistBuddy"
+
 
 
 def parse_options
@@ -77,6 +80,11 @@ def parse_options
     @options[:ipa_export_path] = nil
     opts.on( '-o', '--ipa_export_path FOLDER', 'Set the path of the folder where the ipa will be saved. Default is \'~/Desktop\'' ) do |ipa_export_folder_path|
       @options[:ipa_export_path] = ipa_export_folder_path
+    end
+
+    @options[:developper_identity] = nil
+    opts.on( '-i', '--developper_identity DEVELOPPER_IDENTITY', 'Force the developper identity value' ) do |developper_identity|
+      @options[:developper_identity] = developper_identity
     end
 
     
@@ -157,25 +165,26 @@ def path_of_created_ipa
 end
 
 def developper_identity
-  plistBuddy = "/usr/libexec/PlistBuddy"
+  if @options[:developper_identity]
+    return @options[:developper_identity]
+  end
   
-
-  root_id = `#{plistBuddy} -c Print\\ :rootObject #{xcode_project_file_path}/project.pbxproj`.chop
-  build_configurations_ID = `#{plistBuddy} -c Print\\ :objects:#{root_id}:buildConfigurationList #{xcode_project_file_path}/project.pbxproj`.chop
+  root_id = `#{PLISTBUDDY} -c Print\\ :rootObject #{xcode_project_file_path}/project.pbxproj`.chop
+  build_configurations_ID = `#{PLISTBUDDY} -c Print\\ :objects:#{root_id}:buildConfigurationList #{xcode_project_file_path}/project.pbxproj`.chop
   
   # TODO: Here we are using an hard coded index
-  release_id = `#{plistBuddy} -c Print\\ :objects:#{build_configurations_ID}:buildConfigurations:1 #{xcode_project_file_path}/project.pbxproj`.chop
+  release_id = `#{PLISTBUDDY} -c Print\\ :objects:#{build_configurations_ID}:buildConfigurations:1 #{xcode_project_file_path}/project.pbxproj`.chop
   
-  name_of_configuration = `#{plistBuddy} -c Print\\ :objects:#{release_id}:name #{xcode_project_file_path}/project.pbxproj`.chop  
+  name_of_configuration = `#{PLISTBUDDY} -c Print\\ :objects:#{release_id}:name #{xcode_project_file_path}/project.pbxproj`.chop  
   if (name_of_configuration != "Release")
     puts "Did not found expected configuration - got '#{name_of_configuration}' ; expected 'Release'"
     exit
   end
 
-  # all = `#{plistBuddy} -c Print\\ :objects:#{release_id}:buildSettings #{xcode_project_file_path}/project.pbxproj`
+  # all = `#{PLISTBUDDY} -c Print\\ :objects:#{release_id}:buildSettings #{xcode_project_file_path}/project.pbxproj`
   # puts "all #{all}"
   
-  identity = `#{plistBuddy} -c Print\\ :objects:#{release_id}:buildSettings:CODE_SIGN_IDENTITY[sdk=iphoneos*] #{xcode_project_file_path}/project.pbxproj`.chop
+  identity = `#{PLISTBUDDY} -c Print\\ :objects:#{release_id}:buildSettings:CODE_SIGN_IDENTITY[sdk=iphoneos*] #{xcode_project_file_path}/project.pbxproj`.chop
   
   identity
 end
@@ -188,6 +197,7 @@ end
 def show_all_parameters
   puts "Working with #{xcode_project_file_path}" 
   # puts "SDK Version: #{sdk_version()}"
+  # TODO print everything useful here
 end
 
 def verbose
@@ -198,6 +208,12 @@ end
 def mobileprovision_command_installed
   return system("mobileprovision --version")
 end
+
+
+def path_of_builded_application
+  "#{Dir.pwd}/build/Release-iphoneos/#{project_name}.app"
+end
+
 
 def archive_xcode_project
   
@@ -226,11 +242,12 @@ def archive_xcode_project
   
   if (verbose)
     puts "Developper identity: #{developper_identity}"
+    puts "\nApplication version number: #{application_version_number(path_of_builded_application)}"
   end
   
   growl_alert("Archiving", "Identity: #{developper_identity}\nmobileprovision: `mobileprovision #{mobile_provisionning_profile_path}`")
   
-  xcrun_command = "/usr/bin/xcrun -sdk iphoneos PackageApplication -v \"#{Dir.pwd}/build/Release-iphoneos/#{project_name}.app\" -o \"#{path_of_created_ipa}\" --sign \"#{developper_identity}\" --embed \"#{mobile_provisionning_profile_path}\""
+  xcrun_command = "/usr/bin/xcrun -sdk iphoneos PackageApplication -v \"#{path_of_builded_application}\" -o \"#{path_of_created_ipa}\" --sign \"#{developper_identity}\" --embed \"#{mobile_provisionning_profile_path}\""
   puts "Archiving:\n #{xcrun_command}\n\n\n" if verbose
   `#{xcrun_command}`
   
@@ -240,11 +257,19 @@ def archive_xcode_project
     exit
   end
   
-  puts "Archiving succeedeed"
+  puts "Archiving succeedeed: IPA created"
   puts "IPA file saved to: '#{path_of_created_ipa}'" if verbose
   
   reveal_file_in_finder(path_of_created_ipa) if @options[:show]
   
+end
+
+
+def application_version_number(application_path)
+  product_version_number=`#{PLISTBUDDY} "#{path_of_builded_application}/Info.plist" -c Print\\ :CFBundleVersion`.chop
+  product_version_number=`#{PLISTBUDDY} "#{path_of_builded_application}/#{project_name}-Info.plist" -c Print\\ :CFBundleVersion`.chop if (nil == product_version_number)
+  
+  product_version_number  
 end
 
 
@@ -254,8 +279,7 @@ def create_zip_archive_of_the_symbols
   puts "Archiving the dSYM symbols"
 
   date=`date '+%Y%m%d_%H'h'%M'`.chop
-  #todo : _v${PRODUCT_VERSION_NUMBER}_(rev_${BZR_REVNO}
-  filename_for_dsym_symbols_archive="#{project_name}_#{date}_dSYM_symbols.zip" 
+  filename_for_dsym_symbols_archive="#{project_name}_version_#{application_version_number(path_of_builded_application)}_#{date}_dSYM_symbols.zip" 
   filepath_for_dsym_symbols_archive="#{path_of_directory_where_to_export}/#{filename_for_dsym_symbols_archive}" 
   
   growl_alert("dSYM symbols", "Archiving the dSYM symbols into #{filepath_for_dsym_symbols_archive}")
@@ -287,7 +311,6 @@ end
 
 def reveal_file_in_finder(file_path)
   applescript_command = "tell application \"Finder\"\nreveal POSIX file \"#{file_path}\"\n activate\nend tell"
-  puts "#{applescript_command}"
   `osascript -e '#{applescript_command}'`
 end
 
