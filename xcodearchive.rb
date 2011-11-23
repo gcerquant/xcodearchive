@@ -27,6 +27,7 @@
 
 require 'optparse'
 require 'open3'
+require 'tmpdir'
 
 
 @version_number="0.3"
@@ -113,7 +114,6 @@ xcodearchive -o ~/Documents/my_archives -s  => Save the ipa in the given folder,
 end
 
 
-
 def xcode_project_file_path
   return Dir.pwd + "/" + @options[:project] if (@options[:project])
   
@@ -149,6 +149,13 @@ end
 
 def archive_name
   
+end
+
+@temp_build_directory = nil
+def path_of_temp_directory_where_to_build
+  return @temp_build_directory if @temp_build_directory
+  @temp_build_directory = Dir.mktmpdir  
+  return @temp_build_directory
 end
 
 
@@ -190,7 +197,7 @@ def developper_identity
 end
 
 def mobile_provisionning_profile_path
-  "#{Dir.pwd}/build/Release-iphoneos/#{project_name}.app/embedded.mobileprovision"
+  "#{path_of_builded_application}/embedded.mobileprovision"
 end
 
 
@@ -211,21 +218,29 @@ end
 
 
 def path_of_builded_application
-  "#{Dir.pwd}/build/Release-iphoneos/#{project_name}.app"
+  
+  "#{path_of_temp_directory_where_to_build}/Release-iphoneos/#{project_name}.app"
 end
 
 
 def archive_xcode_project
   
-  puts "Building:\n#{XCODEBUILD} #{xcode_project_file_path()}" if verbose
+  puts "Using temporary path for build: #{path_of_temp_directory_where_to_build}" if verbose
+  
+  build_command="#{XCODEBUILD} -project #{xcode_project_file_path()} SYMROOT=\"#{path_of_temp_directory_where_to_build}\""
+  puts "Building:\n#{build_command}" if verbose
   growl_alert("Building", "Building xCode project #{xcode_project_file_path}")
   
   if @options[:clean_before_building]
     puts "Cleaning Xcode project" if verbose
     `#{XCODEBUILD} -project #{xcode_project_file_path()} clean`
+    if (0 != $?.to_i)
+      puts "Error in xcodebuild (clean): #{$?.to_s}"
+      exit
+    end
   end
   
-  `#{XCODEBUILD} -project #{xcode_project_file_path()}`
+  `#{build_command}`
   
   if (0 != $?.to_i)
     puts "Error in xcodebuild: #{$?.to_s}"
@@ -288,7 +303,7 @@ def create_zip_archive_of_the_symbols
   filename_of_generated_symbols="#{project_name}.app.dSYM"
   
   # If we don't want to have the archive contain hierarchy, we need to cd first
-  Dir.chdir "#{Dir.pwd}/build/Release-iphoneos" do
+  Dir.chdir "#{path_of_temp_directory_where_to_build}/Release-iphoneos" do
     `zip -r -T -y "#{filepath_for_dsym_symbols_archive}" "#{filename_of_generated_symbols}"`
   end
   
