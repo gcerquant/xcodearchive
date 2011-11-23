@@ -15,6 +15,7 @@
 # CHANGELOG
 #   0.2 - Now reads the iPhone developper identity from the Xcode project
 #   0.3 - Option to set the developper identity - Read the application version number and use it in the filename of zip dSYM symbols
+#   0.4 - Build the project in a temporary directory
 
 # CREDITS
 #   Thank you to Vincent Daubry for his discovery of the xcrun command, which greatly simplified this script
@@ -30,7 +31,7 @@ require 'open3'
 require 'tmpdir'
 
 
-@version_number="0.3"
+@version_number="0.4"
 
 
 XCODEBUILD="/Developer/usr/bin/xcodebuild"
