@@ -25,6 +25,8 @@
 #   detect the iPhone developper identity
 #   http://diablotin.info/
 
+# TODO
+# when in verbose mode, displays the logs output by Xcode
 
 require 'optparse'
 require 'open3'
@@ -241,10 +243,11 @@ def archive_xcode_project
     end
   end
   
-  `#{build_command}`
+  output = `#{build_command}`
   
   if (0 != $?.to_i)
     puts "Error in xcodebuild: #{$?.to_s}"
+    puts "#{output}"
     exit
   end
   
@@ -265,11 +268,12 @@ def archive_xcode_project
   
   xcrun_command = "/usr/bin/xcrun -sdk iphoneos PackageApplication -v \"#{path_of_builded_application}\" -o \"#{path_of_created_ipa}\" --sign \"#{developper_identity}\" --embed \"#{mobile_provisionning_profile_path}\""
   puts "Archiving:\n #{xcrun_command}\n\n\n" if verbose
-  `#{xcrun_command}`
+  output = `#{xcrun_command}`
   
   
   if (0 != $?.to_i)
     puts "Error in xcrun: #{$?.to_s}"
+    puts "#{output}"
     exit
   end
   
@@ -282,6 +286,7 @@ end
 
 
 def application_version_number(application_path)
+  # product_version_number=`#{PLISTBUDDY} "#{path_of_builded_application}/Regions-Info.plist" -c Print\\ :CFBundleVersion`.chop
   product_version_number=`#{PLISTBUDDY} "#{path_of_builded_application}/Info.plist" -c Print\\ :CFBundleVersion`.chop
   product_version_number=`#{PLISTBUDDY} "#{path_of_builded_application}/#{project_name}-Info.plist" -c Print\\ :CFBundleVersion`.chop if (nil == product_version_number)
   
@@ -306,6 +311,8 @@ def create_zip_archive_of_the_symbols
   # If we don't want to have the archive contain hierarchy, we need to cd first
   Dir.chdir "#{path_of_temp_directory_where_to_build}/Release-iphoneos" do
     `zip -r -T -y "#{filepath_for_dsym_symbols_archive}" "#{filename_of_generated_symbols}"`
+    
+    # TODO: Check for error here when zipping
   end
   
   puts "dSYM symbols archived into #{filepath_for_dsym_symbols_archive}"
