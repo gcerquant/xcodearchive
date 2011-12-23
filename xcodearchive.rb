@@ -16,6 +16,7 @@
 #   0.2 - Now reads the iPhone developper identity from the Xcode project
 #   0.3 - Option to set the developper identity - Read the application version number and use it in the filename of zip dSYM symbols
 #   0.4 - Build the project in a temporary directory
+#   1.0 - When in verbose mode, displays the logs output by Xcode
 
 # CREDITS
 #   Thank you to Vincent Daubry for his discovery of the xcrun command, which greatly simplified this script
@@ -26,14 +27,21 @@
 #   http://diablotin.info/
 
 # TODO
-# when in verbose mode, displays the logs output by Xcode
+#  Know bugs
+#   - handle the case where the product name is different from target name
+#
+# New Features
+#   - generate a manifest plist file (equivalent of the checkbox "Save for Enterprise" in Xcode)
+#   - be able to force a sdk version
+#   - print the information about the project (base sdk, deployement target, size of ipa)
+
 
 require 'optparse'
 require 'open3'
 require 'tmpdir'
 
 
-@version_number="0.4"
+@version_number="1.0"
 
 
 XCODEBUILD="/Developer/usr/bin/xcodebuild"
