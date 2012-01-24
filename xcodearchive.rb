@@ -17,6 +17,7 @@
 #   0.3 - Option to set the developper identity - Read the application version number and use it in the filename of zip dSYM symbols
 #   0.4 - Build the project in a temporary directory
 #   1.0 - When in verbose mode, displays the logs output by Xcode
+#   1.0.1 - Can now use the --project option using a relative or absolute path
 
 # CREDITS
 #   Thank you to Vincent Daubry for his discovery of the xcrun command, which greatly simplified this script
@@ -39,9 +40,9 @@
 require 'optparse'
 require 'open3'
 require 'tmpdir'
+require 'pathname'
 
-
-@version_number="1.0"
+@version_number="1.0.1"
 
 
 XCODEBUILD="/Developer/usr/bin/xcodebuild"
@@ -126,8 +127,8 @@ end
 
 
 def xcode_project_file_path
-  return Dir.pwd + "/" + @options[:project] if (@options[:project])
-  
+  return Pathname.new(@options[:project]).realpath if (@options[:project])
+  # TODO: Does not work with spaces in the path
   
   all_xcode_projs = Dir.glob("*.xcodeproj")
   if (all_xcode_projs.count == 0)
