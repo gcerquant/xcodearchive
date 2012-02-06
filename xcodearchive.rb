@@ -260,15 +260,16 @@ def archive_xcode_project
     exit
   end
   
-  if (verbose && mobileprovision_command_installed)
-    puts "\nmobileprovision file info:"
-    puts `mobileprovision #{mobile_provisionning_profile_path}`
-    puts "\n\n"
-  else 
-    puts "mobileprovision command not found. Unable to give details about the provisionningprofile."
-  end
   
   if (verbose)
+    if (mobileprovision_command_installed)
+      puts "\nmobileprovision file info:"
+      puts `mobileprovision #{mobile_provisionning_profile_path}`
+      puts "\n\n"
+    else 
+      puts "mobileprovision command not found. Unable to give details about the provisionningprofile."
+    end
+    
     puts "Developper identity: #{developper_identity}"
     puts "\nApplication version number: #{application_version_number(path_of_builded_application)}"
   end
