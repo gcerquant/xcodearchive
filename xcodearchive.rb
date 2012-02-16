@@ -18,6 +18,7 @@
 #   0.4 - Build the project in a temporary directory
 #   1.0 - When in verbose mode, displays the logs output by Xcode
 #   1.0.1 - Can now use the --project option using a relative or absolute path
+#   1.0.2 - Status code return real errors
 
 # CREDITS
 #   Thank you to Vincent Daubry for his discovery of the xcrun command, which greatly simplified this script
@@ -42,7 +43,7 @@ require 'open3'
 require 'tmpdir'
 require 'pathname'
 
-@version_number="1.0.1"
+@version_number="1.0.2"
 
 
 XCODEBUILD="/Developer/usr/bin/xcodebuild"
@@ -50,6 +51,12 @@ BZR="/usr/local/bin/bzr"
 SVN="/usr/bin/svn"
 PLISTBUDDY = "/usr/libexec/PlistBuddy"
 
+ERROR_NO_XCODE_PROJECT_FOUND=2
+ERROR_MULTIPLE_XCODE_PROJECTS_FOUND=3
+ERROR_DID_NOT_FOUND_RELEASE_CONFIGURATION=4
+ERROR_CLEAN=5
+ERROR_BUILD=6
+ERROR_CODESIGN=7
 
 
 def parse_options
@@ -133,12 +140,12 @@ def xcode_project_file_path
   all_xcode_projs = Dir.glob("*.xcodeproj")
   if (all_xcode_projs.count == 0)
     puts "Error: 0 xcodeprojects found"
-    exit
+    exit ERROR_NO_XCODE_PROJECT_FOUND
   end
   
   if (all_xcode_projs.count != 1)
     puts "Error: The directory #{Dir.pwd} contains #{all_xcode_projs.count} projects (file with the extension .xcodeproj). Specify the project to use with the --project option."
-    exit
+    exit ERROR_MULTIPLE_XCODE_PROJECTS_FOUND
   end
   
   Dir.pwd + "/" + all_xcode_projs[0]
@@ -197,7 +204,7 @@ def developper_identity
   name_of_configuration = `#{PLISTBUDDY} -c Print\\ :objects:#{release_id}:name #{xcode_project_file_path}/project.pbxproj`.chop  
   if (name_of_configuration != "Release")
     puts "Did not found expected configuration - got '#{name_of_configuration}' ; expected 'Release'"
-    exit
+    exit ERROR_DID_NOT_FOUND_RELEASE_CONFIGURATION
   end
 
   # all = `#{PLISTBUDDY} -c Print\\ :objects:#{release_id}:buildSettings #{xcode_project_file_path}/project.pbxproj`
@@ -248,7 +255,7 @@ def archive_xcode_project
     `#{XCODEBUILD} -project #{xcode_project_file_path()} clean`
     if (0 != $?.to_i)
       puts "Error in xcodebuild (clean): #{$?.to_s}"
-      exit
+      exit ERROR_CLEAN
     end
   end
   
@@ -257,7 +264,7 @@ def archive_xcode_project
   if (0 != $?.to_i)
     puts "Error in xcodebuild: #{$?.to_s}"
     puts "#{output}"
-    exit
+    exit ERROR_BUILD
   end
   
   
@@ -280,11 +287,10 @@ def archive_xcode_project
   puts "Archiving:\n #{xcrun_command}\n\n\n" if verbose
   output = `#{xcrun_command}`
   
-  
   if (0 != $?.to_i)
     puts "Error in xcrun: #{$?.to_s}"
     puts "#{output}"
-    exit
+    exit ERROR_CODESIGN
   end
   
   puts "Archiving succeedeed: IPA created"
