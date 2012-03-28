@@ -30,7 +30,9 @@
 
 # TODO
 #  Know bugs
+#   - Running the shell commands with the backticks, we loose the stderr output
 #   - handle the case where the product name is different from target name
+
 #
 # New Features
 #   - generate a manifest plist file (equivalent of the checkbox "Save for Enterprise" in Xcode)
@@ -46,7 +48,7 @@ require 'pathname'
 @version_number="1.0.2"
 
 
-XCODEBUILD="/Developer/usr/bin/xcodebuild"
+XCODEBUILD="/usr/bin/xcodebuild"
 BZR="/usr/local/bin/bzr"
 SVN="/usr/bin/svn"
 PLISTBUDDY = "/usr/libexec/PlistBuddy"
@@ -105,6 +107,11 @@ def parse_options
     @options[:developper_identity] = nil
     opts.on( '-i', '--developper_identity DEVELOPPER_IDENTITY', 'Force the developper identity value' ) do |developper_identity|
       @options[:developper_identity] = developper_identity
+    end
+    
+    @options[:mobile_provision] = nil
+    opts.on( '-m', '--mobile_provision MOBILE_PROVISION_NAME', 'Force the mobile provision file to use' ) do |mobile_provision|
+      @options[:mobile_provision] = mobile_provision
     end
 
     
@@ -247,6 +254,7 @@ def archive_xcode_project
   puts "Using temporary path for build: #{path_of_temp_directory_where_to_build}" if verbose
   
   build_command="#{XCODEBUILD} -project #{xcode_project_file_path()} SYMROOT=\"#{path_of_temp_directory_where_to_build}\""
+  build_command += " PROVISIONING_PROFILE=#{@options[:mobile_provision]}" if @options[:mobile_provision]
   puts "Building:\n#{build_command}" if verbose
   growl_alert("Building", "Building xCode project #{xcode_project_file_path}")
   
