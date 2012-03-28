@@ -45,8 +45,10 @@ require 'pathname'
 
 @version_number="1.0.2"
 
-
-XCODEBUILD="/Developer/usr/bin/xcodebuild"
+# Xcode 4.2
+#XCODEBUILD="/Developer/usr/bin/xcodebuild"
+# Xcode 4.3
+XCODEBUILD="/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild"
 BZR="/usr/local/bin/bzr"
 SVN="/usr/bin/svn"
 PLISTBUDDY = "/usr/libexec/PlistBuddy"
