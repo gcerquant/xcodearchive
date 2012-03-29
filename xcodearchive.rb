@@ -47,7 +47,7 @@ require 'pathname'
 
 @version_number="1.0.2"
 
-
+# Use xcode-select -switch <xcode_folder_path> to set your Xcode folder path
 XCODEBUILD="/usr/bin/xcodebuild"
 BZR="/usr/local/bin/bzr"
 SVN="/usr/bin/svn"
