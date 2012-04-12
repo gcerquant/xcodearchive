@@ -59,6 +59,7 @@ ERROR_DID_NOT_FOUND_RELEASE_CONFIGURATION=4
 ERROR_CLEAN=5
 ERROR_BUILD=6
 ERROR_CODESIGN=7
+ERROR_DID_NOT_FOUND_DSYM_FILE=8
 
 
 def parse_options
@@ -118,7 +119,6 @@ def parse_options
     @options[:archive_from_app_path] = nil
     opts.on( '-A', '--archive_from_app_path APP_PATH', 'Create ipa from an existing App path.  Requires both mobile_provision and developper_identity arguments' ) do |app_path|
       @options[:archive_from_app_path] = app_path
-      @options[:no_symbol] = true
     end
 
     @options[:project] = nil
@@ -228,7 +228,7 @@ def developper_identity
   if @options[:developper_identity]
     return @options[:developper_identity]
   end
-  
+
   root_id = `#{PLISTBUDDY} -c Print\\ :rootObject #{xcode_project_file_path}/project.pbxproj`.chop
   build_configurations_ID = `#{PLISTBUDDY} -c Print\\ :objects:#{root_id}:buildConfigurationList #{xcode_project_file_path}/project.pbxproj`.chop
 
@@ -306,7 +306,7 @@ def archive_xcode_project
     exit ERROR_CODESIGN
   end
 
-  puts "Archiving succeedeed: IPA created"
+  puts "\nArchiving succeedeed: IPA created"
   puts "IPA file saved to: '#{path_of_created_ipa}'" if verbose
 
   reveal_file_in_finder(path_of_created_ipa) if @options[:show]
@@ -364,6 +364,12 @@ def create_zip_archive_of_the_symbols
 
 
   filename_of_generated_symbols="#{project_name}.app.dSYM"
+
+  unless File.exists? "#{path_of_temp_directory_where_to_build}/Release-iphoneos/filename_of_generated_symbols"
+    puts "Error: #{ERROR_DID_NOT_FOUND_DSYM_FILE} Could not find your dSYM file."
+    puts 'Try this command again with the no_symbol argument.'
+    exit ERROR_DID_NOT_FOUND_DSYM_FILE
+  end
 
   # If we don't want to have the archive contain hierarchy, we need to cd first
   Dir.chdir "#{path_of_temp_directory_where_to_build}/Release-iphoneos" do
