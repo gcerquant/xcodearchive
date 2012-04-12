@@ -1,9 +1,9 @@
-#!/usr/bin/env ruby 
+#!/usr/bin/env ruby
 #  xcodearchive.rb
-#  
+#
 #  Created by Guillaume Cerquant on 2011-11-16.
 #  Copyright 2011 MacMation. All rights reserved.
-# 
+#
 
 # What is this?
 #   xcodebuild builds an Xcode project
@@ -23,7 +23,7 @@
 # CREDITS
 #   Thank you to Vincent Daubry for his discovery of the xcrun command, which greatly simplified this script
 #   http://blog.octo.com/automatiser-le-deploiement-over-the-air/
-#  
+#
 #   Thank you to Yannick Cadin. Some of his code to detect the SDK version of an Xcode project has been used and adapted to
 #   detect the iPhone developper identity
 #   http://diablotin.info/
@@ -71,18 +71,18 @@ def parse_options
       puts "Version #{@version_number}"
       exit
     end
-    
 
-    @options[:verbose] = false 
+
+    @options[:verbose] = false
     opts.on( '-v', '--verbose', 'Output more information' ) do
       @options[:verbose] = true
     end
-    
+
     @options[:growl] = false
     opts.on( '-g', '--growl', 'Show growl alerts to inform about progress of the build' ) do
       @options[:growl] = true
     end
-    
+
     @options[:no_symbol] = false
     opts.on( '-n', '--do_not_keep_dsym_symbols', 'Do not keep the dSYM symbols' ) do
       @options[:no_symbol] = true
@@ -108,13 +108,13 @@ def parse_options
     opts.on( '-i', '--developper_identity DEVELOPPER_IDENTITY', 'Force the developper identity value' ) do |developper_identity|
       @options[:developper_identity] = developper_identity
     end
-    
+
     @options[:mobile_provision] = nil
     opts.on( '-m', '--mobile_provision MOBILE_PROVISION_NAME', 'Force the mobile provision file to use' ) do |mobile_provision|
       @options[:mobile_provision] = mobile_provision
     end
 
-    
+
     @options[:archive_from_app_path] = nil
     opts.on( '-A', '--archive_from_app_path APP_PATH', 'Create ipa from an existing App path.  Requires both mobile_provision and developper_identity arguments' ) do |app_path|
       @options[:archive_from_app_path] = app_path
@@ -126,17 +126,17 @@ def parse_options
       @options[:project] = xcodeproject_file
       #todo : WILL not work with a full file path
     end
-    
+
     # todo : generate a manifest plist file (will be useful when we will be parsing the version number)
 
     opts.on( '-h', '--help', 'Display this screen' ) do
       puts opts
-      
+
       puts "\n\n\nExamples:\n
 xcodearchive                                => Build the Xcode project of the current folder, generate an archive (ipa), and create a zip with the dSYM symbols
 xcodearchive -n                             => Same as above, but do not keep the symbols
 xcodearchive -o ~/Documents/my_archives -s  => Save the ipa in the given folder, and reveal it in the Finder"
-      
+
       exit
     end
   end
@@ -170,18 +170,18 @@ end
 def xcode_project_file_path
   return Pathname.new(@options[:project]).realpath if (@options[:project])
   # TODO: Does not work with spaces in the path
-  
+
   all_xcode_projs = Dir.glob("*.xcodeproj")
   if (all_xcode_projs.count == 0)
     puts "Error: 0 xcodeprojects found"
     exit ERROR_NO_XCODE_PROJECT_FOUND
   end
-  
+
   if (all_xcode_projs.count != 1)
     puts "Error: The directory #{Dir.pwd} contains #{all_xcode_projs.count} projects (file with the extension .xcodeproj). Specify the project to use with the --project option."
     exit ERROR_MULTIPLE_XCODE_PROJECTS_FOUND
   end
-  
+
   Dir.pwd + "/" + all_xcode_projs[0]
 end
 
@@ -198,17 +198,17 @@ def project_name
 end
 
 def target_name
-  
+
 end
 
 def archive_name
-  
+
 end
 
 @temp_build_directory = nil
 def path_of_temp_directory_where_to_build
   return @temp_build_directory if @temp_build_directory
-  @temp_build_directory = Dir.mktmpdir  
+  @temp_build_directory = Dir.mktmpdir
   return @temp_build_directory
 end
 
@@ -232,11 +232,11 @@ def developper_identity
   
   root_id = `#{PLISTBUDDY} -c Print\\ :rootObject #{xcode_project_file_path}/project.pbxproj`.chop
   build_configurations_ID = `#{PLISTBUDDY} -c Print\\ :objects:#{root_id}:buildConfigurationList #{xcode_project_file_path}/project.pbxproj`.chop
-  
+
   # TODO: Here we are using an hard coded index
   release_id = `#{PLISTBUDDY} -c Print\\ :objects:#{build_configurations_ID}:buildConfigurations:1 #{xcode_project_file_path}/project.pbxproj`.chop
-  
-  name_of_configuration = `#{PLISTBUDDY} -c Print\\ :objects:#{release_id}:name #{xcode_project_file_path}/project.pbxproj`.chop  
+
+  name_of_configuration = `#{PLISTBUDDY} -c Print\\ :objects:#{release_id}:name #{xcode_project_file_path}/project.pbxproj`.chop
   if (name_of_configuration != "Release")
     puts "Did not found expected configuration - got '#{name_of_configuration}' ; expected 'Release'"
     exit ERROR_DID_NOT_FOUND_RELEASE_CONFIGURATION
@@ -244,9 +244,9 @@ def developper_identity
 
   # all = `#{PLISTBUDDY} -c Print\\ :objects:#{release_id}:buildSettings #{xcode_project_file_path}/project.pbxproj`
   # puts "all #{all}"
-  
+
   identity = `#{PLISTBUDDY} -c Print\\ :objects:#{release_id}:buildSettings:CODE_SIGN_IDENTITY[sdk=iphoneos*] #{xcode_project_file_path}/project.pbxproj`.chop
-  
+
   identity
 end
 
@@ -256,7 +256,7 @@ end
 
 
 def show_all_parameters
-  puts "Working with #{xcode_project_file_path}" 
+  puts "Working with #{xcode_project_file_path}"
   # puts "SDK Version: #{sdk_version()}"
   # TODO print everything useful here
 end
@@ -347,40 +347,40 @@ def application_version_number(application_path)
   # product_version_number=`#{PLISTBUDDY} "#{path_of_builded_application}/Regions-Info.plist" -c Print\\ :CFBundleVersion`.chop
   product_version_number=`#{PLISTBUDDY} "#{path_of_builded_application}/Info.plist" -c Print\\ :CFBundleVersion`.chop
   product_version_number=`#{PLISTBUDDY} "#{path_of_builded_application}/#{project_name}-Info.plist" -c Print\\ :CFBundleVersion`.chop if (nil == product_version_number)
-  
-  product_version_number  
+
+  product_version_number
 end
 
 
 def create_zip_archive_of_the_symbols
   return if (@options[:no_symbol])
-  
+
   puts "Archiving the dSYM symbols"
 
   date=`date '+%Y%m%d_%H'h'%M'`.chop
-  filename_for_dsym_symbols_archive="#{project_name}_version_#{application_version_number(path_of_builded_application)}_#{date}_dSYM_symbols.zip" 
-  filepath_for_dsym_symbols_archive="#{path_of_directory_where_to_export}/#{filename_for_dsym_symbols_archive}" 
-  
+  filename_for_dsym_symbols_archive="#{project_name}_version_#{application_version_number(path_of_builded_application)}_#{date}_dSYM_symbols.zip"
+  filepath_for_dsym_symbols_archive="#{path_of_directory_where_to_export}/#{filename_for_dsym_symbols_archive}"
+
   growl_alert("dSYM symbols", "Archiving the dSYM symbols into #{filepath_for_dsym_symbols_archive}")
-  
-  
+
+
   filename_of_generated_symbols="#{project_name}.app.dSYM"
-  
+
   # If we don't want to have the archive contain hierarchy, we need to cd first
   Dir.chdir "#{path_of_temp_directory_where_to_build}/Release-iphoneos" do
     `zip -r -T -y "#{filepath_for_dsym_symbols_archive}" "#{filename_of_generated_symbols}"`
-    
+
     # TODO: Check for error here when zipping
   end
-  
+
   puts "dSYM symbols archived into #{filepath_for_dsym_symbols_archive}"
-  
+
 end
 
 def growl_alert(title, message)
-  if (@options[:growl]) 
+  if (@options[:growl])
     growlnotify="/usr/local/bin/growlnotify" # Edit this if you installed growlnotify in a different place
-    
+
     if (File.executable?(growlnotify))
       `#{growlnotify} "#{title}" -m "#{message}" -d archivingBubble`
     else
