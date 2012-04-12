@@ -212,10 +212,9 @@ def path_of_temp_directory_where_to_build
   return @temp_build_directory
 end
 
-
 def path_of_directory_where_to_export
   if @options[:ipa_export_path]
-    return @options[:ipa_export_path]
+    return File.expand_path(@options[:ipa_export_path])
   else
     return "#{ENV['HOME']}/Desktop/"
   end
