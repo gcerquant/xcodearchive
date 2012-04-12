@@ -115,6 +115,12 @@ def parse_options
     end
 
     
+    @options[:archive_from_app_path] = nil
+    opts.on( '-A', '--archive_from_app_path APP_PATH', 'Create ipa from an existing App path.  Requires both mobile_provision and developper_identity arguments' ) do |app_path|
+      @options[:archive_from_app_path] = app_path
+      @options[:no_symbol] = true
+    end
+
     @options[:project] = nil
     opts.on( '-p', '--project PROJECT', 'Specifiy xcode project') do |xcodeproject_file|
       @options[:project] = xcodeproject_file
@@ -135,8 +141,29 @@ xcodearchive -o ~/Documents/my_archives -s  => Save the ipa in the given folder,
     end
   end
 
-  optparse.parse!
-  
+  begin
+    optparse.parse!
+
+    # archive_from_app_path should also require developer_identity and mobile_provision or it
+    # won't make it into the AppStore ;)
+    if @options[:archive_from_app_path]
+      mandatory = [:developper_identity, :mobile_provision]
+      missing = mandatory.select{ |param| @options[param].nil? }
+    end
+    if missing && !missing.empty?
+      puts 'Additional arugments required for: archive_from_app_path'
+      puts "Missing options: #{missing.join(', ')}\n\n"
+      puts optparse
+      exit
+    end
+  rescue OptionParser::InvalidOption, OptionParser::MissingArgument
+    puts $!.to_s
+    puts optparse
+    exit
+  end
+
+  puts "Performing task with options: #{@options.inspect}"
+
 end
 
 
@@ -165,6 +192,7 @@ end
 
 
 def project_name
+  return File.basename(@options[:archive_from_app_path], '.app') if @options[:archive_from_app_path]
   File.basename( xcode_project_file_path(), ".xcodeproj")
 
 end
@@ -244,20 +272,58 @@ end
 
 
 def path_of_builded_application
-  
-  "#{path_of_temp_directory_where_to_build}/Release-iphoneos/#{project_name}.app"
+  if @options[:archive_from_app_path]
+    File.expand_path(@options[:archive_from_app_path])
+  else
+    "#{path_of_temp_directory_where_to_build}/Release-iphoneos/#{project_name}.app"
+  end
 end
 
-
 def archive_xcode_project
-  
+  if (verbose)
+    if (mobileprovision_command_installed)
+      puts "\nmobileprovision file info:"
+      puts `mobileprovision #{mobile_provisionning_profile_path}`
+      puts "\n\n"
+    else
+      puts "mobileprovision command not found. Unable to give details about the provisionningprofile."
+    end
+
+    puts "Developper identity: #{developper_identity}"
+    puts "\nApplication version number: #{application_version_number(path_of_builded_application)}"
+  end
+
+  growl_alert("Archiving", "Identity: #{developper_identity}\nmobileprovision: `mobileprovision #{mobile_provisionning_profile_path}`")
+
+  mobile_provision_path = @options[:mobile_provision] || mobile_provisionning_profile_path
+  sign_identity_opt = "--sign \"#{developper_identity}\"" if developper_identity
+  xcrun_command = "/usr/bin/xcrun -sdk iphoneos PackageApplication -v \"#{path_of_builded_application}\" -o \"#{path_of_created_ipa}\" #{sign_identity_opt} --embed \"#{mobile_provision_path}\""
+  puts "Archiving:\n #{xcrun_command}\n\n\n" if verbose
+  output = `#{xcrun_command}`
+
+  if (0 != $?.to_i)
+    puts "Error in xcrun: #{$?.to_s}"
+    puts "#{output}"
+    exit ERROR_CODESIGN
+  end
+
+  puts "Archiving succeedeed: IPA created"
+  puts "IPA file saved to: '#{path_of_created_ipa}'" if verbose
+
+  reveal_file_in_finder(path_of_created_ipa) if @options[:show]
+
+end
+
+def build_xcode_project
+  return if @options[:archive_from_app_path]
+
   puts "Using temporary path for build: #{path_of_temp_directory_where_to_build}" if verbose
-  
+
   build_command="#{XCODEBUILD} -project #{xcode_project_file_path()} SYMROOT=\"#{path_of_temp_directory_where_to_build}\""
   build_command += " PROVISIONING_PROFILE=#{@options[:mobile_provision]}" if @options[:mobile_provision]
   puts "Building:\n#{build_command}" if verbose
   growl_alert("Building", "Building xCode project #{xcode_project_file_path}")
-  
+
   if @options[:clean_before_building]
     puts "Cleaning Xcode project" if verbose
     `#{XCODEBUILD} -project #{xcode_project_file_path()} clean`
@@ -266,46 +332,14 @@ def archive_xcode_project
       exit ERROR_CLEAN
     end
   end
-  
+
   output = `#{build_command}`
-  
+
   if (0 != $?.to_i)
     puts "Error in xcodebuild: #{$?.to_s}"
     puts "#{output}"
     exit ERROR_BUILD
   end
-  
-  
-  if (verbose)
-    if (mobileprovision_command_installed)
-      puts "\nmobileprovision file info:"
-      puts `mobileprovision #{mobile_provisionning_profile_path}`
-      puts "\n\n"
-    else 
-      puts "mobileprovision command not found. Unable to give details about the provisionningprofile."
-    end
-    
-    puts "Developper identity: #{developper_identity}"
-    puts "\nApplication version number: #{application_version_number(path_of_builded_application)}"
-  end
-  
-  growl_alert("Archiving", "Identity: #{developper_identity}\nmobileprovision: `mobileprovision #{mobile_provisionning_profile_path}`")
-  
-  xcrun_command = "/usr/bin/xcrun -sdk iphoneos PackageApplication -v \"#{path_of_builded_application}\" -o \"#{path_of_created_ipa}\" --sign \"#{developper_identity}\" --embed \"#{mobile_provisionning_profile_path}\""
-  puts "Archiving:\n #{xcrun_command}\n\n\n" if verbose
-  output = `#{xcrun_command}`
-  
-  if (0 != $?.to_i)
-    puts "Error in xcrun: #{$?.to_s}"
-    puts "#{output}"
-    exit ERROR_CODESIGN
-  end
-  
-  puts "Archiving succeedeed: IPA created"
-  puts "IPA file saved to: '#{path_of_created_ipa}'" if verbose
-  
-  reveal_file_in_finder(path_of_created_ipa) if @options[:show]
-  
 end
 
 
@@ -366,6 +400,6 @@ parse_options
 
 show_all_parameters if verbose
 
-archive_xcode_project()
-create_zip_archive_of_the_symbols()
-
+build_xcode_project
+archive_xcode_project
+create_zip_archive_of_the_symbols
