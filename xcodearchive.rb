@@ -115,9 +115,8 @@ def parse_options
       @options[:mobile_provision] = mobile_provision
     end
 
-
     @options[:archive_from_app_path] = nil
-    opts.on( '-A', '--archive_from_app_path APP_PATH', 'Create ipa from an existing App path.  Requires both mobile_provision and developper_identity arguments' ) do |app_path|
+    opts.on( '-a', '--archive_from_app_path APP_PATH', 'Create ipa from an existing App path.  Requires both mobile_provision and developper_identity arguments' ) do |app_path|
       @options[:archive_from_app_path] = app_path
     end
 
