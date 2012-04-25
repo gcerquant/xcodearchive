@@ -142,8 +142,6 @@ xcodearchive -o ~/Documents/my_archives -s  => Save the ipa in the given folder,
 
   optparse.parse!
 
-  puts "Performing task with options: #{@options.inspect}"
-
 end
 
 
@@ -234,7 +232,8 @@ end
 
 
 def show_all_parameters
-  puts "Working with #{xcode_project_file_path}"
+  puts "Working with #{project_name || xcode_project_file_path}"
+  puts "\nPerforming task with options: #{@options.inspect}"
   # puts "SDK Version: #{sdk_version()}"
   # TODO print everything useful here
 end
@@ -267,7 +266,7 @@ def archive_xcode_project
       puts "mobileprovision command not found. Unable to give details about the provisionningprofile."
     end
 
-    puts "Developper identity: #{developper_identity}"
+    puts "\nDevelopper identity: #{developper_identity}"
     puts "\nApplication version number: #{application_version_number(path_of_builded_application)}"
   end
 
