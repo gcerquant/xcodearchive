@@ -273,8 +273,10 @@ def archive_xcode_project
 
   mobile_provision_path = @options[:mobile_provision] || mobile_provisionning_profile_path
   sign_identity_opt = "--sign \"#{developper_identity}\"" if developper_identity
-  xcrun_command = "/usr/bin/xcrun -sdk iphoneos PackageApplication -v \"#{path_of_builded_application}\" -o \"#{path_of_created_ipa}\" #{sign_identity_opt} --embed \"#{mobile_provision_path}\""
-  puts "Archiving:\n #{xcrun_command}\n\n\n" if verbose
+  # FIXME we need to separate the path from the name used
+  embed_mobile_provision_opt = "--embed \"#{mobile_provision_path}\""
+  xcrun_command = "/usr/bin/xcrun -sdk iphoneos PackageApplication -v \"#{path_of_builded_application}\" -o \"#{path_of_created_ipa}\" #{sign_identity_opt} #{embed_mobile_provision_opt}"
+  puts "\nArchiving:\n #{xcrun_command}\n\n\n" if verbose
   output = `#{xcrun_command}`
 
   if (0 != $?.to_i)
