@@ -140,26 +140,7 @@ xcodearchive -o ~/Documents/my_archives -s  => Save the ipa in the given folder,
     end
   end
 
-  begin
-    optparse.parse!
-
-    # archive_from_app_path should also require developer_identity and mobile_provision or it
-    # won't make it into the AppStore ;)
-    if @options[:archive_from_app_path]
-      mandatory = [:developper_identity, :mobile_provision]
-      missing = mandatory.select{ |param| @options[param].nil? }
-    end
-    if missing && !missing.empty?
-      puts 'Additional arugments required for: archive_from_app_path'
-      puts "Missing options: #{missing.join(', ')}\n\n"
-      puts optparse
-      exit
-    end
-  rescue OptionParser::InvalidOption, OptionParser::MissingArgument
-    puts $!.to_s
-    puts optparse
-    exit
-  end
+  optparse.parse!
 
   puts "Performing task with options: #{@options.inspect}"
 
