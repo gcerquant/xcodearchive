@@ -116,7 +116,7 @@ def parse_options
     end
 
     @options[:archive_from_app_path] = nil
-    opts.on( '-a', '--archive_from_app_path APP_PATH', 'Create ipa from an existing App path.  Requires both mobile_provision and developper_identity arguments' ) do |app_path|
+    opts.on( '-a', '--archive_from_app_path APP_PATH', 'Create ipa from an existing App path.' ) do |app_path|
       @options[:archive_from_app_path] = app_path
     end
 
@@ -174,7 +174,6 @@ end
 def project_name
   return File.basename(@options[:archive_from_app_path], '.app') if @options[:archive_from_app_path]
   File.basename( xcode_project_file_path(), ".xcodeproj")
-
 end
 
 def target_name
@@ -346,7 +345,7 @@ def create_zip_archive_of_the_symbols
   filename_of_generated_symbols="#{project_name}.app.dSYM"
 
   unless File.exists? "#{path_of_temp_directory_where_to_build}/Release-iphoneos/filename_of_generated_symbols"
-    puts "Error: #{ERROR_DID_NOT_FOUND_DSYM_FILE} Could not find your dSYM file."
+    puts "Error: Could not find your dSYM file."
     puts 'Try again with the --no_symbol option.'
     exit ERROR_DID_NOT_FOUND_DSYM_FILE
   end
