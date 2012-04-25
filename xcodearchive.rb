@@ -347,7 +347,7 @@ def create_zip_archive_of_the_symbols
 
   unless File.exists? "#{path_of_temp_directory_where_to_build}/Release-iphoneos/filename_of_generated_symbols"
     puts "Error: #{ERROR_DID_NOT_FOUND_DSYM_FILE} Could not find your dSYM file."
-    puts 'Try this command again with the no_symbol argument.'
+    puts 'Try again with the --no_symbol option.'
     exit ERROR_DID_NOT_FOUND_DSYM_FILE
   end
 
