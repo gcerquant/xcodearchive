@@ -146,8 +146,7 @@ end
 
 
 def xcode_project_file_path
-  return Pathname.new(@options[:project]).realpath if (@options[:project])
-  # TODO: Does not work with spaces in the path
+  return File.expand_path(@options[:project]) if (@options[:project])
 
   all_xcode_projs = Dir.glob("*.xcodeproj")
   if (all_xcode_projs.count == 0)
@@ -160,7 +159,7 @@ def xcode_project_file_path
     exit ERROR_MULTIPLE_XCODE_PROJECTS_FOUND
   end
 
-  Dir.pwd + "/" + all_xcode_projs[0]
+  File.expand_path("./#{all_xcode_projs[0]}")
 end
 
 # def sdk_version
